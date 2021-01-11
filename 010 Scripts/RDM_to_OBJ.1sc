@@ -1,0 +1,62 @@
+//--------------------------------------
+//--- 010 Editor v5.0 Script File
+//
+// File:     RDM_to_OBJ.1sc
+// Author:   Adrian Dale
+// Revision: 1.0
+// Purpose:  Convert Anno 2070 .rdm model
+//           to Wavefront .obj format
+//  Category: Format Specific
+//   History: 
+//   1.0   2020-03-07 fgh: Initial version.
+//--------------------------------------
+
+int ConvertRDMToOBJ(string filename)
+{
+    int activeFile = FileOpen(filename);
+    if (activeFile < 0)
+    {
+        Warning( "File %s could not be opened\n", filename );
+        return -1;
+    }
+
+    FileSelect(activeFile);
+    RunTemplate("Anno2070_RDM.bt", false);
+
+    char outputFileName[] = FileNameSetExtension(GetFileName(), ".obj");
+    int outFile = FileNew("Text", false);
+
+    FileSelect(activeFile);
+    int i;
+    for( i = 0; i < vertexCount; i++ )
+    {
+        FPrintf(outFile, "v %f %f %f\n", vertexData[i].x, vertexData[i].y, vertexData[i].z);
+    }
+
+    // Normals? - all zero, anyway
+    //for( i = 0; i < vertexCount; i++ )
+    //{
+    //    FPrintf(outFile, "vn %f %f %f\n", vertexData[i].ntx, vertexData[i].nty, vertexData[i].ntz);
+    //}
+
+    for( i = 0; i < vertexCount; i++ )
+    {
+        FPrintf(outFile, "vt %f %f\n", vertexData[i].u, vertexData[i].v);
+    }
+    for( i = 0; i < indexCount / 3; i++ )
+    {
+        FPrintf(outFile, "f %d/%d %d/%d %d/%d\n", triangles[i].i1 + 1, triangles[i].i1 + 1,
+                                        triangles[i].i2 + 1, triangles[i].i2 + 1,
+                                        triangles[i].i3 + 1, triangles[i].i3 + 1);
+    }
+    
+    FileSelect(outFile);
+    FileSave(outputFileName);
+    FileClose();
+
+    FileSelect(activeFile);
+    FileClose();
+    return 0;
+}
+
+ConvertRDMToOBJ(GetFileName());

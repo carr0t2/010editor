@@ -1,0 +1,37 @@
+//------------------------------------------------
+//--- 010 Editor v10.0.2 Script File
+//
+//      File: OpenURL.1sc
+//   Authors: SweetScape Software
+//   Version: 1.0
+//   Purpose: If the current selection contains a URL
+//      starting with http:// or https://, the URL
+//      is loaded with the default browser.
+//  Category: Text
+//   History: 
+//   1.0   2020-10-21 SweetScape Software: Initial version.
+//------------------------------------------------
+
+// Check for selection
+if( GetSelSize() == 0 )
+{
+    MessageBox( idOk, GetScriptName(), "Please make a selection before running this script." );
+    return -1;
+}
+
+// Read string
+int size = GetSelSize();
+if( size > 2048 )
+    size = 2048;
+string url = ReadString( GetSelStart(), size );
+
+// Check if starts with http
+string prefix = SubStr( url, 0, 7 );
+if( (prefix != "http://") && (prefix != "https:/") )
+{
+    MessageBox( idOk, GetScriptName(), "Could not open URL. URLs should start with http:// or https://" );
+    return -1;
+}
+
+// Open the link
+Exec( url, "" );

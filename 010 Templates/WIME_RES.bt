@@ -1,0 +1,292 @@
+//------------------------------------------------
+//--- 010 Editor v5.0 Binary Template
+//
+//      File: WIME_RES.bt
+//   Authors: Pavel Reznicek
+//   Version: 4.0
+//   Purpose: Read War in Middle Earth (WIME) resource files.
+//  Category: Game
+// File Mask: *.res
+//  ID Bytes: 10 00 00 00, 00 00 00 10
+//   History: 
+//   4.0   2020-12-08 PR: FRML header support added
+//------------------------------------------------
+
+LittleEndian();
+local ulong headerSize = ReadUInt(0);
+if (headerSize < 0x10000) {
+    LittleEndian(); 
+} else { 
+    BigEndian();
+};
+
+
+typedef struct RESOURCEFILEHEADER
+{
+    DWORD HeaderSize      <bgcolor = cLtGreen>;
+    DWORD DataSegmentSize <bgcolor = cGreen>;
+    DWORD DataSize        <bgcolor = cLtGreen>;
+    DWORD FileEndLength   <bgcolor = cGreen>;
+};
+
+/*
+typedef struct DATACHUNK
+{
+    ulong chunkSize <bgcolor=cGreen>;
+    uchar chunkData[chunkSize - IMAG_HEADER_SIZE];
+};
+*/
+
+RESOURCEFILEHEADER Header <bgcolor=cLtGreen>;
+
+/* We skip reading of the data chunks for now;
+let's read them after we know about each resource type */
+
+/*
+// Counting chunks...
+
+local int chunkCount = 0;
+local ulong nextChunkSize = 0;
+nextChunkSize = ReadUInt(FTell());
+FSeek(FTell() + 4);
+//Printf("chunkCount: %d\n", chunkCount);
+//Printf("Position: %d\n", FTell());
+//Printf("nextChunkSize: %d\n", nextChunkSize);
+while ((FTell() + nextChunkSize) <= Header.DataSegmentSize)
+{
+    FSeek(FTell() + nextChunkSize);
+    nextChunkSize = ReadUInt(FTell());
+    FSeek(FTell() + 4);
+    chunkCount++;
+    //Printf("chunkCount: %d\n", chunkCount);
+    //Printf("Position: %d\n", FTell());
+    //Printf("nextChunkSize: %d\n", nextChunkSize);
+};
+
+FSeek(Header.HeaderSize);
+
+DATACHUNK DataChunks[chunkCount] <optimize=false>;
+*/
+
+FSeek(Header.DataSegmentSize);
+
+RESOURCEFILEHEADER EndDataHeader;
+
+WORD WordsAfterEndDataHeader[4] <bgcolor=cGray>;
+WORD Word1C <bgcolor=cDkYellow>;
+WORD WordsAfter1C[2] <bgcolor=cGray>;
+
+typedef struct RESOURCETYPE
+{
+    char ID[4] <bgcolor = cBlue, fgcolor = cWhite>;
+	short MaxResourceIndex <bgcolor = cLtBlue>;
+    short Unknown06 <bgcolor = cGray>;
+};
+
+// We search for resource types
+local char ID[5] = "----";
+local int type_count = 0;
+local int i;
+local byte found = TRUE;
+local byte cstr_found = FALSE;
+local ushort cstr_count = 0;
+local int64 pos = FTell();
+while (found)
+{
+    for (i=0; i<4; i++)
+    {
+        ID[i] = ReadByte(
+            pos + i
+        );
+    };
+    //Printf("Resource ID Candidate: %s\n", ID);
+    if ((ID == "CSTR") || (ID == "RTSC"))
+	{
+        cstr_found = TRUE;
+        cstr_count = ReadShort(pos + 4) + 1;
+	};
+    found = 
+       ((ID == "CSTR") || (ID == "RTSC") ||
+        (ID == "IMAG") || (ID == "GAMI") ||
+        (ID == "FRML") || (ID == "LMRF") ||
+        (ID == "FONT") || (ID == "TNOF") ||
+        (ID == "MMAP") || (ID == "PAMM") ||
+        (ID == "CHAR") || (ID == "RAHC"));
+	if (found)
+  	{
+        //Printf("Resource ID found: %s\n", ID);
+    	type_count++;
+		pos += 8;
+    };
+};
+
+//Printf("Resource type count: %d\n", type_count);
+
+RESOURCETYPE ResourceTypes[type_count];
+
+// Let's count the total number of data chunks
+local int chunk_count = 0;
+for (i = 0; i < type_count; i++)
+{
+    chunk_count += ResourceTypes[i].MaxResourceIndex + 1;
+};
+
+typedef struct RESOURCEMAPENTRY
+{
+    //uchar ResourceMapEntry[12];
+    ushort ResourceNumber <bgcolor = cLtPurple>;
+    ushort Unknown02 <bgcolor = cGray>;
+    ushort ChunkLocation <bgcolor = cLtPurple>;
+    ubyte LocationMultiplier <bgcolor = cPurple>;
+    byte Unknown07 <bgcolor = cGray>;
+    byte Unknown08 <bgcolor = cGray>;
+    byte Unknown09 <bgcolor = cGray>;
+    byte Unknown10 <bgcolor = cGray>;
+    byte Unknown11 <bgcolor = cGray>;
+};
+
+RESOURCEMAPENTRY ResourceMap[chunk_count];
+
+typedef struct CSTRMAPENTRY
+{
+    uchar CSTRMapEntry[8] <bgcolor = cGray>;
+};
+
+
+/*
+local int cstrmdccount = 0;
+for (pos = FTell(); pos < FileSize() - 2; pos+=8)
+{
+    cstrmdccount++;
+};
+*/
+
+if (cstr_count > 0)
+    CSTRMAPENTRY CSTRMap[cstr_count];
+
+short Ending <bgcolor = cBlack, fgcolor=cWhite>;
+
+//local const int IMAG_HEADER_SIZE = 22;
+
+typedef struct IMAGHEADER{
+    //uchar HeaderBytes[IMAG_HEADER_SIZE];
+    ulong uncompressedChunkSize <bgcolor = cDkRed, fgcolor = cLtBlue>;
+    ubyte byte08                <bgcolor = cGray,  fgcolor = cDkBlue>;
+    ubyte byte09                <bgcolor = cGray,  fgcolor = cLtBlue>;
+    ubyte byte10                <bgcolor = cGray,  fgcolor = cDkBlue>;
+    ubyte byte11                <bgcolor = cGray,  fgcolor = cLtBlue>;
+    ubyte byte12                <bgcolor = cGray,  fgcolor = cDkBlue>;
+    ubyte byte13                <bgcolor = cGray,  fgcolor = cLtBlue>;
+    ubyte byte14                <bgcolor = cGray,  fgcolor = cDkBlue>;
+    ubyte byte15                <bgcolor = cGray,  fgcolor = cLtBlue>;
+    ubyte imagePlane            <bgcolor = cLtRed, fgcolor = cDkBlue>;
+    ushort resWidth             <bgcolor = cDkRed, fgcolor = cLtBlue>;
+    ubyte resHeight             <bgcolor = cLtRed, fgcolor = cDkBlue>;
+    ubyte resPal                <bgcolor = cDkRed, fgcolor = cLtBlue>;
+    ubyte byte21                <bgcolor = cGray,  fgcolor = cDkBlue>;
+};
+
+//Printf("Size of the IMAG header is: %d\n", sizeof(IMAGHEADER)); 
+
+typedef struct IMAGCHUNK{
+    ulong chunkSize             <bgcolor = cRed, fgcolor = cBlue>;
+    IMAGHEADER IMAGHeader;
+    ubyte pixelData[chunkSize - sizeof(IMAGHeader)] <bgcolor = cDkRed, fgcolor = cLtBlue>;
+};
+
+typedef struct FRMLCELLHEADER{
+    ubyte cellID                <bgcolor = cLtPurple, fgcolor = cDkBlue>;
+    ubyte unknown02             <bgcolor = cGray,     fgcolor = cLtBlue>;
+    ubyte unknown03             <bgcolor = cGray,     fgcolor = cDkBlue>;
+    ubyte cellWidth             <bgcolor = cDkPurple, fgcolor = cLtBlue>;
+    ubyte cellHeight            <bgcolor = cDkPurple, fgcolor = cLtBlue>;
+};
+
+typedef struct FRMLHEADER{
+    ulong uncompressedChunkSize <bgcolor = cLtPurple, fgcolor = cDkBlue>;
+    ubyte byte08                <bgcolor = cGray,     fgcolor = cLtBlue>;
+    ushort cellCount        <bgcolor = cLtPurple, fgcolor = cDkBlue>;
+    //ubyte byte10              <bgcolor = cGray,     fgcolor = cLtBlue>;
+    ubyte byte11                <bgcolor = cGray,     fgcolor = cLtBlue>;
+    FRMLCELLHEADER FRMLKey[cellCount];
+};
+
+typedef struct FRMLCHUNK{
+    ulong chunkSize <bgcolor = cPurple, fgcolor = cBlue>;
+    FRMLHEADER FRMLHeader;
+    ubyte chunkData[chunkSize - sizeof(FRMLHeader)] <bgcolor = cLtPurple, fgcolor = cDkBlue>;
+};
+
+typedef struct MMAPCHUNK{
+    ulong chunkSize <bgcolor = cYellow, fgcolor = cGreen>;
+    ubyte chunkData[chunkSize] <bgcolor = cLtYellow, fgcolor = cDkGreen>;
+};
+
+typedef struct CHARCHUNK{
+    ulong chunkSize <bgcolor = cAqua, fgcolor = cYellow>;
+    ubyte chunkData[chunkSize] <bgcolor = cLtAqua, fgcolor = cDkYellow>;
+};
+
+typedef struct FONTCHUNK{
+    ulong chunkSize <bgcolor = cBlue, fgcolor = cRed>;
+    ubyte chunkData[chunkSize] <bgcolor = cLtBlue, fgcolor = cDkRed>;
+};
+
+typedef struct CSTRCHUNK{
+    ulong chunkSize <bgcolor = cGray, fgcolor = cSilver>;
+    char chunkData[chunkSize] <bgcolor = cLtGray, fgcolor = cBlack>;
+};
+
+// Let's return back to the start and highlight the resources:
+FSeek(Header.HeaderSize);
+
+local uint res_count = 0;
+
+for (i = 0; i < type_count; i++)
+{
+    ID = ResourceTypes[i].ID;
+    //Printf("Resource type ID: %s\n", ID);
+    res_count = ResourceTypes[i].MaxResourceIndex + 1;
+    //Printf("Resource count: %d\n", res_count);
+    switch (ID)
+    {
+        case "IMAG":
+            IMAGCHUNK IMAGChunks[res_count] <optimize=false>;
+            break;
+        case "GAMI":
+            IMAGCHUNK IMAGChunks[res_count] <optimize=false>;
+            break;
+        case "FRML":
+            FRMLCHUNK FRMLChunks[res_count] <optimize=false>;
+            break;
+        case "LMRF":
+            FRMLCHUNK FRMLChunks[res_count] <optimize=false>;
+            break;
+        case "MMAP":
+            MMAPCHUNK MMAPChunks[res_count] <optimize=false>;
+            break;
+        case "PAMM":
+            MMAPCHUNK MMAPChunks[res_count] <optimize=false>;
+            break;
+        case "CHAR":
+            CHARCHUNK CHARChunks[res_count] <optimize=false>;
+            break;
+        case "RAHC":
+            CHARCHUNK CHARChunks[res_count] <optimize=false>;
+            break;
+        case "FONT":
+            FONTCHUNK FONTChunks[res_count] <optimize=false>;
+            break;
+        case "TNOF":
+            FONTCHUNK FONTChunks[res_count] <optimize=false>;
+            break;
+        case "CSTR":
+            CSTRCHUNK CSTRChunks[res_count] <optimize=false>;
+            break;
+        case "RTSC":
+            CSTRCHUNK CSTRChunks[res_count] <optimize=false>;
+            break;
+        default:;
+    };
+    
+};

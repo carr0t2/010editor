@@ -1,0 +1,25 @@
+//------------------------------------------------
+//--- 010 Editor v11.0.1 Binary Template
+//
+//      File: AUD.bt
+//   Authors: Matthias Mailänder
+//   Version: 1.0
+//   Purpose: Westwood Studios .aud sound format
+//  Category: Audio
+// File Mask: *.aud
+//  ID Bytes: 
+//   History:
+//   1.0   2020-12-15 Matthias Mailänder: initial release
+//------------------------------------------------
+
+SetBackColor(cLtGray);
+uint16 sampleRate;
+int32 dataSize;
+int32 outputSize;
+ubyte soundflag;
+ubyte soundFormat;
+
+SetBackColor(cLtBlue);
+byte input[dataSize];
+
+Assert(FEof());

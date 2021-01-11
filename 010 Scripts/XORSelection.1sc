@@ -1,0 +1,226 @@
+//------------------------------------------------
+//--- 010 Editor Script File
+//
+//      File: XORSelection.1sc
+//   Authors: Didier Stevens
+//   Version: 6.0
+//   Purpose: Xors the current selection with a set of bytes, 
+//            which causes the bytes to be encoded so they 
+//            cannot be read by a human. Run the Xor again on 
+//            the encoded selection to decode the data.
+//  Category: Binary
+//   History: 
+//   6.0   2020-11-04 D Stevens: added option c
+//   5.0   2020-05-07 D Stevens: added options
+//   4.0   2018-03-25 D Stevens: refactoring to handle keys with null bytes and hex keys with whitespace
+//   3.1   2016-02-10 SweetScape Software: Updated header for repository submission.
+//   3.0   2014-12-11 D Stevens: Added hex processing; refactoring
+//   1.0   2009-05-26 D Stevens: start
+//
+// Source code put in public domain by Didier Stevens, no Copyright
+// https://DidierStevens.com
+// Use at your own risk
+//------------------------------------------------
+
+#define TITLE "XORSelection"
+
+unsigned int uiOptionsReverse = 0;
+unsigned int uiOptionsLiteral = 0;
+int iOptionsShift = 0;
+unsigned int uiOptionsChangeKeyWithValueBeforeXOR = 0;
+unsigned int uiOptionsChangeKeyWithValueAfterXOR = 0;
+
+int HexDigitToInt(int digit)
+{
+    if (digit >= '0' && digit <= '9')
+        return digit - '0';
+    if (digit >= 'a' && digit <= 'f')
+        return digit - 'a' + 10;
+    if (digit >= 'A' && digit <= 'F')
+        return digit - 'A' + 10;
+    return -1;
+}
+
+string RemoveWhitespace(string sInput)
+{
+    int iIter;
+    string sResult = "";
+
+    for (iIter = 0; iIter < Strlen(sInput); iIter++)
+        if (sInput[iIter] != ' ' && sInput[iIter] != '\n' && sInput[iIter] != '\r' && sInput[iIter] != '\t')
+            sResult = sResult + sInput[iIter];
+    return sResult;
+}
+
+unsigned int CalculateKeyIndex(int iIter, int iKeyLength)
+{
+    if (1 == uiOptionsReverse)
+        return iKeyLength - 1 - (iIter + iOptionsShift) % iKeyLength;
+   	else
+        return (iIter + iOptionsShift) % iKeyLength;
+}
+
+unsigned int ParseOptions(string sInput)
+{
+    string sOption;
+    unsigned int uiReturn = 0;
+    
+    uiOptionsReverse = 0;
+    uiOptionsLiteral = 0;
+    iOptionsShift = 0;
+    uiOptionsChangeKeyWithValueBeforeXOR = 0;
+    uiOptionsChangeKeyWithValueAfterXOR = 0;
+
+    while (sInput != "")
+    {
+        sOption = SubStr(sInput, 0, 1);
+        sInput = SubStr(sInput, 1);
+        if ("r" == sOption)
+            uiOptionsReverse = 1;
+        else if ("l" == sOption)
+            uiOptionsLiteral = 1;
+        else if ("s" == sOption)
+        {
+            int iSign = 1;
+
+            if ('-' == sInput[0])
+            {
+                sInput = SubStr(sInput, 1);
+                iSign = -1;
+            }
+            iOptionsShift = 0;
+            while (sInput[0] >= '0' && sInput[0] <= '9')
+            {
+                iOptionsShift = iOptionsShift * 10 + sInput[0] - '0';
+                sInput = SubStr(sInput, 1);
+            }
+            iOptionsShift = iOptionsShift * iSign;
+        }
+        else if ("c" == sOption)
+        {
+
+            if ('b' == sInput[0])
+                uiOptionsChangeKeyWithValueBeforeXOR = 1;
+            else if ('a' == sInput[0])
+                uiOptionsChangeKeyWithValueAfterXOR = 1;
+            else
+                uiReturn = 1;
+            sInput = SubStr(sInput, 1);
+        }
+        else
+            uiReturn = 1;
+    }
+    
+    return uiReturn;
+}
+
+void Main(void)
+{
+    int iIter, iStart, iSize, iKeyLength;
+    string sKey;
+    string sOptions;
+    uchar ucRead;
+
+    // Check that a file is open
+    if(FileCount() == 0)
+    {
+        MessageBox(idOk, TITLE, "XORSelection can only be executed when a file is loaded.");
+        return;
+    }
+
+    // Initializes the variables
+    iSize = GetSelSize();
+    iStart = GetSelStart();
+
+    // Check that bytes were selected
+    if(iSize == 0)
+    {
+        iSize = FileSize();
+        iStart = 0;
+    }
+
+    sOptions = "";
+    sKey = InputString(TITLE, "Input XOR key (start with 0x for hex), or leave empty for options", "");
+    if (sKey == "")
+    {
+        sOptions = InputString(TITLE, "Options (h for help)", "");
+        if (sOptions == "")
+        {
+            return;
+        }
+        else if (sOptions == "h")
+        {
+            MessageBox(idOk, TITLE, "r: reverse key\nl: literal key\ns: shift value (signed integer)\ncb: change key with value before XOR\nca: change key with value after XOR");
+            return;
+        }
+        if (ParseOptions(sOptions))
+        {
+            MessageBox(idOk, TITLE, "Please enter valid options.");
+            return;
+        }
+        sKey = InputString(TITLE, "Input the key (start with 0x for hex)", "");
+        if (sKey == "")
+        {
+            MessageBox(idOk, TITLE, "Please enter a valid key.");
+            return;
+        }
+    }
+    if (SubStr(sKey, 0, 2) == "0x" && 0 == uiOptionsLiteral)
+    {
+        string sHex = RemoveWhitespace(SubStr(sKey, 2));
+        int iIter2;
+        int iHexDigit1;
+        int iHexDigit2;
+    
+        if (Strlen(sHex) % 2 != 0)
+        {
+            MessageBox(idOk, TITLE, "Please enter a valid hex value (uneven digits).");
+            return;
+        }
+        iKeyLength = Strlen(sHex) / 2;
+        if (iKeyLength == 0)
+        {
+            MessageBox(idOk, TITLE, "Please enter a valid hex value (no digits).");
+            return;
+        }
+        uchar aucKey[iKeyLength];
+        for (iIter2 = 0; iIter2 < Strlen(sHex); iIter2 += 2)
+        {
+            iHexDigit1 = HexDigitToInt(sHex[iIter2]);
+            if (iHexDigit1 == -1)
+            {
+                MessageBox(idOk, TITLE, "Please enter a valid hex value: digit %c is not hexadecimal.", sHex[iIter2]);
+                return;
+            }
+            iHexDigit2 = HexDigitToInt(sHex[iIter2 + 1]);
+            if (iHexDigit2 == -1)
+            {
+                MessageBox(idOk, TITLE, "Please enter a valid hex value: digit %c is not hexadecimal.", sHex[iIter2 + 1]);
+                return;
+            }
+            aucKey[iIter2 / 2] = iHexDigit1 * 0x10 + iHexDigit2;
+        }
+    }
+    else
+    {
+        string aucKey = sKey;
+        iKeyLength = Strlen(sKey);
+    }
+
+    if (iOptionsShift < 0)
+        iOptionsShift = (iOptionsShift % iKeyLength) + iKeyLength;
+
+    // Modify the selection
+    for (iIter = 0; iIter < iSize; iIter++)
+    {
+        // Modify the current byte
+        ucRead = ReadUByte(iStart + iIter);
+        WriteUByte(iStart + iIter, ucRead ^ aucKey[CalculateKeyIndex(iIter, iKeyLength)]);
+        if (1 == uiOptionsChangeKeyWithValueBeforeXOR)
+            aucKey[CalculateKeyIndex(iIter, iKeyLength)] = ucRead;
+        if (1 == uiOptionsChangeKeyWithValueAfterXOR)
+            aucKey[CalculateKeyIndex(iIter, iKeyLength)] = ucRead ^ aucKey[CalculateKeyIndex(iIter, iKeyLength)];
+    }
+}
+
+Main();

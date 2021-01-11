@@ -1,0 +1,501 @@
+//==========================================================
+//        010 Editor Prefetch Template  
+//             File: PF.bt             
+//          Authors: Changhwan Ji, Hyunjin Kim, Heo Songyi
+//          Version: 0.1
+//          Purpose: Quick template for parsing Windows Prefetch(*.pf)
+//         Category: Misc
+//        File Mask: *.pf
+//           E-mail: ckd2555@gmail.com
+//         ID Bytes: 53 43 43 41 // SCCA
+//          History: 
+//          0.1   2021-01-01 Changhwan Ji,Hyunjin Kim, Heo Songyi: Initial release
+//==========================================================
+
+typedef enum <int> {
+    Windows10 = 0x1E,
+    Windows8x = 0x1A,
+    Windows7orVista = 0x17,
+    WindowsXPor2003 = 0x11
+} Version;
+
+typedef enum <int> {
+    Boot = 0x01,
+    Application =0x00
+} Flag;
+
+typedef struct {
+    Version version;
+    char Signature[4]; //SCCA
+    byte Unknown[4];
+    int FileSize;
+    wchar_t FileName[30];
+    int Hash <format=hex>;
+    Flag flag;
+} FileHeader <optimize=true>;
+
+typedef struct {
+    wstring read;
+} Entry_3 <read=ReadWstring>;
+
+typedef struct{
+    byte FileReferenceMFTEntryIndex[6];
+    byte SequenceNumber[2];
+} FileReference;
+
+wstring ReadWstring(Entry_3 &read)
+{
+    return read.read;
+}
+
+typedef struct {
+    uint16 StringNumberOfCharacters <format=hex>;
+    wstring DirectoryString;
+} DirectoryStrings;
+
+typedef struct {
+    uint16 StringNumberOfCharacters <format=hex>;
+    wstring DirectoryString;
+} TrailingData;
+
+typedef struct {
+    local int num;
+    for (num = 0; num < VolumeInfo.VolumeEntry.NumberDirectoryStrings; num++)
+        TrailingData Data;
+} Trailing;
+
+typedef struct {
+
+} Error;
+
+//■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+//■■■■■■■■■■■■■■■■■■■      Windows 10     ■■■■■■■■■■■■■■■■■■■■■■■
+//■■■■■■■■■■■■■■■■■■■  header version 30  ■■■■■■■■■■■■■■■■■■■■■■■
+//■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+
+typedef struct {
+    uint MetricsOffset <format=hex>;
+    uint MetricsvolumeentryNum;
+    uint ChainsOffset <format=hex>;
+    uint TraceChainsvolumeentryNum;
+    uint NameStringOffset <format=hex>;
+    uint NameStringSize;
+    uint VolumesInformationOffset <format=hex>;
+    uint VolumesNum;
+    uint VolumesInformarionSize;
+    uint64 Unknown1;
+    FILETIME LastRunTime[8];
+    uint64 Unknown2;
+    uint RunCount;
+    uint Unknown3;
+    uint Unknown4;
+    uint64 Unknown5[11];
+} Win10_FileInfomation;
+
+typedef struct {
+    uint PrefetchStartTime;
+    uint PrefetchDuration;
+    uint AveragePrefetchDuration;
+    uint FileNameStringOffset;
+    uint FileNameStringNumber;
+    uint Flags;
+    FileReference Data;
+} Win10_Entry_1;
+
+typedef struct {
+    local int num1;
+    for (num1 =0; num1 < FileInfo.MetricsvolumeentryNum; num1++)
+        Win10_Entry_1 array;
+} Win10_FileMetricsArray;
+
+typedef struct {
+    uint TotalBlockLoadCount;
+    uint UnKnown;
+} Win10_Entry_2;
+
+typedef struct {
+    local int num2;
+    for (num2 =0; num2 < FileInfo.TraceChainsvolumeentryNum; num2++)
+        Win10_Entry_2 array;
+} Win10_TraceChainArray;
+
+typedef struct {
+    while (FTell() - FileInfo.NameStringOffset < FileInfo.NameStringSize)
+        Entry_3 Array;
+} Win10_FileNameStrings;
+
+typedef struct {
+    uint UnKnown;
+    uint NumberOfFileReference;
+    uint64 Unknown;
+    local int num = VolumeInfo.VolumeEntry.FileReferencesDataSize - 16;
+    byte ArrayOfFileReference[num];
+} Win10_FileReferences;
+
+typedef struct {
+    local int64 now = FTell();
+    uint VolumeDevicePathOffset <format=hex>;
+    uint NumberVolumeDevicePath;
+    FILETIME VolumeCreateTime;
+    uint VolumeSerialNumber <format=hex>;
+    uint FileReferencesOffset <format=hex>;
+    uint FileReferencesDataSize;
+    uint DirectoryStringsOffset <format=hex>;
+    uint NumberDirectoryStrings;
+    uint Unknown1;
+    uint64 UnKnown2[3];
+    uint CopyNumberDirectoryStrings;
+    uint64 UnKnown3[3];
+    uint Unknown;
+} Win10_VolumeInformationEntry;
+
+typedef struct {
+    FSeek(VolumeInfo.VolumeEntry.now + VolumeInfo.VolumeEntry.VolumeDevicePathOffset);
+    wstring VolumeDevicePath;
+    FSeek(VolumeInfo.VolumeEntry.now+ VolumeInfo.VolumeEntry.FileReferencesOffset);
+    Win10_FileReferences FileReferences;
+    FSeek(VolumeInfo.VolumeEntry.now + VolumeInfo.VolumeEntry.DirectoryStringsOffset);
+    DirectoryStrings DirStrings;
+} Win10_VolumeInformationData;
+
+typedef struct {
+    Win10_VolumeInformationEntry VolumeEntry;
+    Win10_VolumeInformationData VolumeData;
+} Win10_VolumeInformation;
+
+//■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+//■■■■■■■■■■■■■■■■■■■■      Windows 8.1    ■■■■■■■■■■■■■■■■■■■■■■■
+//■■■■■■■■■■■■■■■■■■■■  header version 26  ■■■■■■■■■■■■■■■■■■■■■■■
+//■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+
+typedef struct {
+    uint MetricsOffset <format=hex>;
+    uint MetricsvolumeentryNum;
+    uint ChainsOffset <format=hex>;
+    uint TraceChainsvolumeentryNum;
+    uint NameStringOffset <format=hex>;
+    uint NameStringSize;
+    uint VolumesInformationOffset <format=hex>;
+    uint VolumesNum;
+    uint VolumesInformarionSize;
+    uint64 Unknown1;
+    FILETIME LastRunTime[8];
+    uint64 Unknown2[2];
+    uint RunCount;
+    uint Unknown3;
+    uint Unknown4;
+    uint64 Unknown5[11];
+} Win8_FileInfomation;
+
+typedef struct {
+    uint PrefetchStartTime;
+    uint PrefetchDuration;
+    uint AveragePrefetchDuration;
+    uint FileNameStringOffset <format=hex>;
+    uint FileNameStringNumber;
+    uint Flags;
+    FileReference Data;
+} Win8_Entry_1;
+
+typedef struct {
+    local int num1;
+    for (num1 =0; num1 < FileInfo.MetricsvolumeentryNum; num1++)
+        Win8_Entry_1 array;
+} Win8_FileMetricsArray;
+
+typedef struct {
+    uint NextArrayEntryIndex;
+    uint TotalBlockLoadCount;
+    uint UnKnown;
+} Win8_Entry_2;
+
+typedef struct {
+    local int num2;
+    for (num2 =0; num2 < FileInfo.TraceChainsvolumeentryNum; num2++)
+        Win8_Entry_2 array;
+} Win8_TraceChainArray;
+
+typedef struct {
+    while (FTell() - FileInfo.NameStringOffset < FileInfo.NameStringSize)
+        Entry_3 array;
+} Win8_FileNameStrings;
+
+typedef struct {
+    uint UnKnown;
+    uint NumberOfFileReference;
+    uint64 Unknown;
+    local int num = VolumeInfo.VolumeEntry.FileReferencesDataSize - 16;
+    byte ArrayOfFileReference[num];
+} Win8_FileReferences;
+
+typedef struct {
+    local int64 now = FTell();
+    uint VolumeDevicePathOffset <format=hex>;
+    uint NumberVolumeDevicePath;
+    FILETIME VolumeCreateTime;
+    uint VolumeSerialNumber <format=hex>;
+    uint FileReferencesOffset <format=hex>;
+    uint FileReferencesDataSize;
+    uint DirectoryStringsOffset <format=hex>;
+    uint NumberDirectoryStrings;
+    uint UnKnown1;
+    uint UnKnown2[7];
+    uint CopyNumberDirectoryStrings;
+    uint UnKnown3[7];
+    uint UnKnown4;
+} Win8_VolumeInformationEntry;
+
+typedef struct {
+    FSeek(VolumeInfo.VolumeEntry.now + VolumeInfo.VolumeEntry.VolumeDevicePathOffset);
+    wstring VolumeDevicePath;
+    FSeek(VolumeInfo.VolumeEntry.now + VolumeInfo.VolumeEntry.FileReferencesOffset);
+    Win8_FileReferences FileReferences;
+    FSeek(VolumeInfo.VolumeEntry.now + VolumeInfo.VolumeEntry.DirectoryStringsOffset);
+    DirectoryStrings DirStrings;
+} Win8_VolumeInformationData;
+
+typedef struct {
+    Win8_VolumeInformationEntry VolumeEntry;
+    Win8_VolumeInformationData VolumeData;
+} Win8_VolumeInformation;
+
+//■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+//■■■■■■■■■■■■■■■■■■■■      Windows 7      ■■■■■■■■■■■■■■■■■■■■■■■
+//■■■■■■■■■■■■■■■■■■■■  header version 23  ■■■■■■■■■■■■■■■■■■■■■■■
+//■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+
+typedef struct {
+    uint MetricsOffset <format=hex>;
+    uint MetricsvolumeentryNum;
+    uint ChainsOffset <format=hex>;
+    uint TraceChainsvolumeentryNum;
+    uint NameStringOffset <format=hex>;
+    uint NameStringSize;
+    uint VolumesInformationOffset <format=hex>;
+    uint VolumesNum;
+    uint VolumesInformarionSize;
+    uint64 Unknown1;
+    FILETIME LastRunTime;
+    uint64 Unknown2[2];
+    uint RunCount;
+    uint Unknown3;
+    uint Unknown4;
+    uint64 Unknown5[10];
+} Win7_FileInfomation;
+
+typedef struct {
+    uint PrefetchStartTime;
+    uint PrefetchDuration;
+    uint AveragePrefetchDuration;
+    uint FileNameStringOffset;
+    uint FileNameStringNumber;
+    uint Flags;
+    FileReference Data;
+} Win7_Entry_1;
+
+typedef struct {
+    local int num1;
+    for (num1 =0; num1 < FileInfo.MetricsvolumeentryNum; num1++)
+        Win7_Entry_1 array;
+} Win7_FileMetricsArray;
+
+typedef struct {
+    uint NextArrayEntryIndex;
+    uint TotalBlockLoadCount;
+    uint UnKnown;
+} Win7_Entry_2;
+
+typedef struct {
+    local int num2;
+    for (num2 =0; num2 < FileInfo.TraceChainsvolumeentryNum; num2++)
+        Win7_Entry_2 array;
+} Win7_TraceChainArray;
+
+typedef struct {
+    while (FTell() - FileInfo.NameStringOffset < FileInfo.NameStringSize)
+        Entry_3 array;
+} Win7_FileNameStrings;
+
+typedef struct {
+    uint UnKnown;
+    uint NumberOfFileReferences;
+    uint64 Unknown;
+    local int num = VolumeInfo.VolumeEntry.FileReferencesDataSize - 16;
+    byte ArrayOfFileReference[num];
+} Win7_FileReferences;
+
+typedef struct {
+    local int64 now = FTell();
+    uint VolumeDevicePathOffset <format=hex>;
+    uint NumberVolumeDevicePath;
+    FILETIME VolumeCreateTime;
+    uint VolumeSerialNumber <format=hex>;
+    uint FileReferencesOffset <format=hex>;
+    uint FileReferencesDataSize;
+    uint DirectoryStringsOffset <format=hex>;
+    uint NumberDirectoryStrings;
+    uint UnKnown1;
+    uint UnKnown2[7];
+    uint CopyNumberDirectoryStrings;
+    uint UnKnown3[7];
+    uint UnKnown4;
+} Win7_VolumeInformationEntry;
+
+typedef struct {
+    FSeek(VolumeInfo.VolumeEntry.now + VolumeInfo.VolumeEntry.VolumeDevicePathOffset);
+    wstring Volumestring;
+    FSeek(VolumeInfo.VolumeEntry.now + VolumeInfo.VolumeEntry.FileReferencesOffset);
+    Win7_FileReferences FileReferences;
+    FSeek(VolumeInfo.VolumeEntry.now + VolumeInfo.VolumeEntry.DirectoryStringsOffset);
+    DirectoryStrings DirStrings;
+} Win7_VolumeInformationData;
+
+typedef struct {
+    Win7_VolumeInformationEntry VolumeEntry;
+    Win7_VolumeInformationData VolumeData;
+} Win7_VolumeInformation;
+
+//■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+//■■■■■■■■■■■■■■■■■■■■      Windows XP     ■■■■■■■■■■■■■■■■■■■■■■■
+//■■■■■■■■■■■■■■■■■■■■  header version 17  ■■■■■■■■■■■■■■■■■■■■■■■
+//■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+
+typedef struct {
+    uint MetricsOffset <format=hex>;
+    uint MetricsvolumeentryNum;
+    uint ChainsOffset <format=hex>;
+    uint TraceChainsvolumeentryNum;
+    uint NameStringOffset <format=hex>;
+    uint NameStringSize;
+    uint VolumesInformationOffset <format=hex>;
+    uint VolumesNum;
+    uint VolumesInformationSize; 
+    FILETIME LastRunTime;
+    uint64 unknown[2];
+    uint RunCount;
+    uint Unknown;
+} Winxp_FileInformation;
+
+typedef struct {
+    uint PrefetchStartTime;
+    uint PrefetchDuration;
+    uint FileNameStringOffset;
+    uint FileNameStringNumber;
+    uint Flags;
+} Winxp_Entry_1;
+
+typedef struct {
+    local int num1;
+    for (num1 =0; num1 < FileInfo.MetricsvolumeentryNum; num1++)
+        Winxp_Entry_1 array;
+} Winxp_FileMetricsArray;
+
+typedef struct {
+    uint NextArrayEntryIndex;
+    uint TotalBlockLoadCount;
+    uint UnKnown;
+} Winxp_Entry_2;
+
+typedef struct {
+    local int num2;
+    for (num2 =0; num2 < FileInfo.TraceChainsvolumeentryNum; num2++)
+        Winxp_Entry_2 array;
+} Winxp_TraceChainArray;
+
+typedef struct {
+    while (FTell() - FileInfo.NameStringOffset < FileInfo.NameStringSize)
+        Entry_3 array;
+} Winxp_FileNameStrings;
+
+typedef struct {
+    uint UnKnown;
+    uint NumberOfFileReferences;
+    local int num = VolumeInfo.VolumeEntry.FileReferencesDataSize - 8;
+    byte ArrayOfFileReference[num];
+} Winxp_FileReferences;
+
+typedef struct {
+    local int64 now = FTell();
+    uint VolumeDevicePathOffset ㅣ<format=hex>;
+    uint NumberVolumeDevicePath;
+    FILETIME VolumeCreateTime;
+    uint VolumeSerialNumber <format=hex>;
+    uint FileReferencesOffset <format=hex>;
+    uint FileReferencesDataSize;
+    uint DirectoryStringsOffset <format=hex>;
+    uint NumberDirectoryStrings;
+    uint UnKnown1;
+} VolumeInformationEntry;
+
+typedef struct {
+    FSeek(VolumeInfo.VolumeEntry.now + VolumeInfo.VolumeEntry.VolumeDevicePathOffset);
+    wstring VolumeDevicePath;
+    FSeek(VolumeInfo.VolumeEntry.now + VolumeInfo.VolumeEntry.FileReferencesOffset);
+    Winxp_FileReferences FileReferences;
+    FSeek(VolumeInfo.VolumeEntry.now + VolumeInfo.VolumeEntry.DirectoryStringsOffset);
+    DirectoryStrings DirStrings;
+} VolumeInformationData;
+
+typedef struct {
+    VolumeInformationEntry VolumeEntry;
+    VolumeInformationData VolumeData;
+} Winxp_VolumesInformation;
+
+
+//■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■■
+//■■■■■■■■■■■■■■■■■■■■■■      MAIN       ■■■■■■■■■■■■■■■■■■■■■■■■■
+
+LittleEndian();
+FileHeader header;
+if(header.version == 30)
+{
+    Win10_FileInfomation FileInfo;
+    FSeek(FileInfo.MetricsOffset);
+    Win10_FileMetricsArray FileMetrics;
+    FSeek(FileInfo.ChainsOffset);
+    Win10_TraceChainArray TraceChain;
+    FSeek(FileInfo.NameStringOffset);
+    Win10_FileNameStrings FileName;
+    FSeek(FileInfo.VolumesInformationOffset);
+    Win10_VolumeInformation VolumeInfo;
+    Trailing Data;
+}
+else if(header.version == 26)
+{
+    Win8_FileInfomation FileInfo;
+    FSeek(FileInfo.MetricsOffset);
+    Win8_FileMetricsArray FileMetrics;
+    FSeek(FileInfo.ChainsOffset);
+    Win8_TraceChainArray TraceChain;
+    FSeek(FileInfo.NameStringOffset);
+    Win8_FileNameStrings FileName;
+    FSeek(FileInfo.VolumesInformationOffset);
+    Win8_VolumeInformation VolumeInfo;
+    Trailing Data;
+}
+else if(header.version == 23)
+{
+    Win7_FileInfomation FileInfo;
+    FSeek(FileInfo.MetricsOffset);
+    Win7_FileMetricsArray FileMetrics;
+    FSeek(FileInfo.ChainsOffset);
+    Win7_TraceChainArray TraceChain;
+    FSeek(FileInfo.NameStringOffset);
+    Win7_FileNameStrings FileName;
+    FSeek(FileInfo.VolumesInformationOffset);
+    Win7_VolumeInformation VolumeInfo;
+    Trailing Data;
+}
+else if(header.version == 17)
+{
+    Winxp_FileInformation FileInfo;
+    FSeek(FileInfo.MetricsOffset);
+    Winxp_FileMetricsArray FileMetrics;
+    FSeek(FileInfo.ChainsOffset);
+    Winxp_TraceChainArray TraceChain;
+    FSeek(FileInfo.NameStringOffset);
+    Winxp_FileNameStrings FileName;
+    FSeek(FileInfo.VolumesInformationOffset);
+    Winxp_VolumesInformation VolumeInfo;
+    Trailing Data;
+}

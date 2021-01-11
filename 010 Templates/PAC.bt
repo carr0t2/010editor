@@ -1,0 +1,212 @@
+//------------------------------------------------
+//--- 010 Editor v10.0.2 Binary Template
+//
+//      File: PAC.bt
+//   Authors: Volodymyr Khomenko
+//   Version: 1.0
+//   Purpose: Kerberos PAC - KERB_VALIDATION_INFO
+//  Category: Security
+// File Mask: *
+//  ID Bytes: 01 10 08 00 CC CC CC CC
+//   History:
+//   1.0   2020-12-15 volodymyr: created from Microsoft specifications
+//------------------------------------------------
+
+// [MS-RPCE] 2.2.6.1 Common Type Header for the Serialization Stream
+enum <ubyte> ENDIANESS {
+    BIG_ENDIAN = 0,
+    LITTLE_ENDIAN = 0x10
+};
+        
+// [MS-RPCE] 2.2.6.1 Common Type Header for the Serialization Stream
+typedef struct {
+    SetBackColor(0x9999FF);
+    unsigned char Version;
+    ENDIANESS Endianness;
+    unsigned short CommonHeaderLength;
+    unsigned long Filler <format=hex,comment="Reserved field. MUST be set to 0xcccccccc on marshaling, and SHOULD be ignored during unmarshaling">;
+} CommonTypeHeader;
+
+// [MS-DTYP] 2.3.3 FILETIME
+// Not needed - already defined as base type of 010 hex editor!
+/*
+typedef struct {
+    SetBackColor(0xCC3333);
+    DWORD dwLowDateTime;
+    DWORD dwHighDateTime;
+} FILETIME;
+*/
+// [MS-RPCE] 2.2.6.2 Private Header for Constructed Type
+typedef struct {
+    SetBackColor(0x33FF33);
+    DWORD ObjectBufferLength;
+    DWORD Filler;
+} PrivateHeader;
+
+typedef DWORD PtrReferent <bgcolor=0x0000CC,fgcolor=0xffffff, format=hex>;
+
+// [MS-DTYP] 2.3.10 RPC_UNICODE_STRING
+typedef struct {
+    SetBackColor(0x5DE45D);
+    unsigned short Length;
+    unsigned short MaximumLength;
+    PtrReferent Buffer;
+} RPC_UNICODE_STRING;
+
+// [MS-RPCE] 4.7 UNICODE_STRING Representation
+typedef struct {
+    DWORD MaximumCount;
+    DWORD Offset;
+    DWORD ActualCount;
+    if (ActualCount > 0)
+        wchar_t str[ActualCount] <bgcolor=0xCCFFCC>;
+    if (ActualCount & 1)
+        USHORT padding <bgcolor=0x000000,fgcolor=0xffffff,format=hex>;
+} UNICODE_STRING_Body <comment=UNICODE_STRING_Comment>;
+
+wstring UNICODE_STRING_Comment( UNICODE_STRING_Body &s )
+{
+    if (s.ActualCount > 0)
+        return s.str;
+    return "";
+}
+
+// [MS-PAC] 2.2.2 GROUP_MEMBERSHIP
+typedef struct {
+    ULONG RelativeId;
+    ULONG Attributes <format=hex>;
+} GROUP_MEMBERSHIP;
+
+// [MS-DTYP] 2.4.1.1 RPC_SID_IDENTIFIER_AUTHORITY
+typedef struct {
+   byte Value[6];
+} RPC_SID_IDENTIFIER_AUTHORITY;
+
+// [MS-DTYP] 2.4.2.3 RPC_SID
+typedef struct {
+    unsigned char Revision;
+    unsigned char SubAuthorityCount;
+    RPC_SID_IDENTIFIER_AUTHORITY IdentifierAuthority;
+    if ( SubAuthorityCount > 0)
+        unsigned long SubAuthority[SubAuthorityCount];
+} RPC_SID <comment=RPC_SID_Comment>;
+
+string RPC_SID_Comment(RPC_SID &sid)
+{
+    local string buf;
+    local string buf2;
+    local uint64 i;
+    local uint64 sub_auth = 0;
+    for (i = 0; i < 6; i++)        
+        sub_auth = (sub_auth << 8 ) + sid.IdentifierAuthority.Value[i];
+    SPrintf(buf, "S-%d-%Lu", sid.Revision, sub_auth);
+    for (i=0; i < sid.SubAuthorityCount; i++) {
+        SPrintf(buf2, "-%u", sid.SubAuthority[i]);
+        buf += buf2;        
+    }
+    return buf;
+}
+
+typedef struct {
+    DWORD SubAuthorityCount;
+    RPC_SID SidBody;
+} SID <comment=SID_Comment>;
+
+string SID_Comment(SID &sid)
+{
+    return RPC_SID_Comment(sid.SidBody);
+}
+    
+
+// [MS-PAC] 2.5 KERB_VALIDATION_INFO
+typedef struct {
+    PtrReferent KerbValidationInfoReferent;
+    FILETIME LogonTime;
+    FILETIME LogoffTime;
+    FILETIME KickOffTime;
+    FILETIME PasswordLastSet;
+    FILETIME PasswordCanChange;
+    FILETIME PasswordMustChange;
+    RPC_UNICODE_STRING EffectiveName;
+    RPC_UNICODE_STRING FullName;
+    RPC_UNICODE_STRING LogonScript;
+    RPC_UNICODE_STRING ProfilePath;
+    RPC_UNICODE_STRING HomeDirectory;
+    RPC_UNICODE_STRING HomeDirectoryDrive;
+    USHORT LogonCount;
+    USHORT BadPasswordCount;
+    ULONG UserId <bgcolor=0x00FFFF>;
+    ULONG PrimaryGroupId <bgcolor=0x993300, fgcolor=0xFFFFFF>;
+    ULONG GroupCount <bgcolor=0xCCCCCC>;
+    PtrReferent GroupIdsReferent;
+    ULONG UserFlags <format=hex>;
+    char UserSessionKey[16] <bgcolor=0x9999FF>;
+    RPC_UNICODE_STRING LogonServer;
+    RPC_UNICODE_STRING LogonDomainName;
+    PtrReferent LogonDomainIdReferent;
+    ULONG Reserved1[2];
+    ULONG UserAccountControl <format=hex>;
+    ULONG SubAuthStatus;
+    FILETIME LastSuccessfulILogon;
+    FILETIME LastFailedILogon;
+    ULONG FailedILogonCount;
+    ULONG Reserved3;
+    ULONG SidCount <bgcolor=0xCCCCCC>;
+    PtrReferent ExtraSidsReferent;
+    PtrReferent ResourceGroupDomainSidReferent;
+    ULONG ResourceGroupCount <bgcolor=0xCCCCCC>;
+    PtrReferent ResourceGroupIdsReferent;
+} KERB_VALIDATION_INFO;
+
+// [MS-PAC] 2.2.1 KERB_SID_AND_ATTRIBUTES
+typedef struct {
+   PtrReferent SidReferent;
+   ULONG Attributes <format=hex>;
+} KERB_SID_AND_ATTRIBUTES;
+
+//----------------------------------------------------
+// main
+
+LittleEndian(); 
+CommonTypeHeader common_header;
+
+if ( common_header.Version != 1 )
+{
+    Warning( "Version other than 1 is not supported yet" );
+    return -1;
+}
+
+PrivateHeader private_header;
+KERB_VALIDATION_INFO body <open=true>;
+
+// [MS-PAC] 2.5 KERB_VALIDATION_INFO for details (UserFlags field)
+local uint NETLOGON_EXTRA_SIDS_USER_FLAG = 0x20;
+local uint NETLOGON_RESOURCE_GROUPS_USER_FLAG = 0x200;
+
+UNICODE_STRING_Body EffectiveName;
+UNICODE_STRING_Body FullName;
+UNICODE_STRING_Body LogonScript;
+UNICODE_STRING_Body ProfilePath;
+UNICODE_STRING_Body HomeDirectory;
+UNICODE_STRING_Body HomeDirectoryDrive;
+if ( body.GroupCount > 0) {
+    DWORD GroupIdsCount;
+    GROUP_MEMBERSHIP GroupIds[GroupIdsCount];
+}
+UNICODE_STRING_Body LogonServer;
+UNICODE_STRING_Body LogonDomainName;
+SID LogonDomainId;
+
+if ( (body.SidCount > 0) && (body.UserFlags & NETLOGON_EXTRA_SIDS_USER_FLAG)) {
+    DWORD ExtraSidsCount;
+    KERB_SID_AND_ATTRIBUTES ExtraSidsAttributes[ExtraSidsCount];
+    SID ExtraSids[ExtraSidsCount] <optimize=false>;
+}
+
+if (body.UserFlags & NETLOGON_RESOURCE_GROUPS_USER_FLAG) {
+    SID ResourceGroupDomainSid;
+    if (body.ResourceGroupCount > 0) {
+        DWORD ResourceGroupIdsCount;
+        GROUP_MEMBERSHIP ResourceGroupIds[ResourceGroupIdsCount];
+    }
+}

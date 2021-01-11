@@ -1,0 +1,75 @@
+//------------------------------------------------
+//--- 010 Editor v11.0 Binary Template
+//
+//      File: SND-WAV.bt
+//   Authors: Devyatyi9
+//   Version: 0.1
+//   Purpose: Parses the snd-wav container format, used in Z-Engine (SkullGirls).
+//  Category: Game
+// File Mask: *.snd-wav
+//  ID Bytes: 
+//   History: 
+//   0.1   2020-11-25 Devyatyi9: Initial release.
+//------------------------------------------------
+
+typedef enum <uint> {
+	S_OGG 		= 0x5367674F, //OggS
+	S_RIFF 		= 0x46464952 //RIFF WAVE
+} SignatureTYPE <format=hex>;
+
+//Skip unknown data
+local uint tag;
+local uint i;
+for ( i = 4; i < (FileSize() - 3); i++ )
+{
+    FSeek(i);
+    tag = ReadUInt( FTell() );
+    if (tag == S_OGG || tag == S_RIFF)
+    {
+        break;
+    }
+} FSkip(-16); //return to sounds count
+//Check file
+if ( i == (FileSize() - 3) )
+    {
+        Warning( "File is not a valid SND-WAV file. Template stopped." );
+        return -1;
+    }
+
+typedef struct {
+uint count <name="Sounds count",bgcolor=cPurple>;
+} Header;
+Header hs <name="Header",open=true>;
+
+
+typedef struct {
+uint SoundSize <name="Sound size",bgcolor=cDkAqua>;
+int emptidata[2] <hidden=true>;
+if( SoundSize > 0 )
+    {
+    struct SoundSignBody {
+        char FileTag[4] <name="tag",fgcolor=cYellow,open=suppress>;
+        ubyte SoundBody[SoundSize-4] <name="body",open=suppress>;
+    }; SoundSignBody ssb <name=GetSndExt,bgcolor=cLtPurple,open=suppress>;
+    }
+} SoundFile;
+
+typedef struct {
+local uint i;
+    for (i = 0; i < hs.count; i++) {
+        SoundFile sfs <name="Sound file",bgcolor=cSilver>;}
+} SoundsBlock;
+SoundsBlock sbs <name="Sounds block",open=true>;
+
+
+string GetSndExt(SoundSignBody &ssb)
+{   
+    if (ssb.FileTag == "OggS")
+    {
+        return "Ogg file";
+    }
+    if (ssb.FileTag == "RIFF")
+    {
+        return "Wav file";
+    }
+};

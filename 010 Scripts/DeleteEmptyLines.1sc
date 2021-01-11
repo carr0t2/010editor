@@ -1,0 +1,100 @@
+//------------------------------------------------------------------------------
+//--- 010 Editor v6.0.1 Script File
+//
+//      File: DeleteEmptyLines.1sc
+//   Authors: SweetScape Software
+//   Version: 1.1
+//   Purpose: Deletes all empty lines in the selection.
+//            If no lines are selected all empty lines
+//            in the file are deleted. Note this 
+//            functionality is now built into 010 Editor
+//            using 'Format > Delete Blank Lines'.
+//  Category: Text
+//   History:
+//   1.1   2020-06-20 HTC - VinCSS (a member of Vingroup): Del blank lines after trim
+//   1.0   2016-03-15 SweetScape Software: Initial release.
+//
+//------------------------------------------------------------------------------
+
+// Trim all a string
+void StrTrimAll(string &strLine)
+{
+    int i, len;
+
+    len = Strlen(strLine);
+    if (len > 0)
+    {
+        for (i = 0; (i < len) && IsCharWhitespace(strLine[i]); ++i);
+        if (i > 0)
+        {
+            strLine = SubStr(strLine, i);
+        }
+
+        len = Strlen(strLine);
+        for (i = len - 1; (i >= 0) && IsCharWhitespace(strLine[i]); --i);
+        strLine[i + 1] = 0;
+    }
+}
+
+int Main(void)
+{
+    int64 i, startLine, endLine = -1, count = 0;
+    int   width;
+    string strLine;
+
+    // Calculate start and end
+    if (GetSelSize() > 0)
+    {
+        startLine = TextAddressToLine(GetSelStart());
+        endLine   = TextAddressToLine(GetSelStart() + GetSelSize());
+    }
+    else
+    {
+        startLine = 0;
+        endLine   = TextGetNumLines() - 1;
+    }
+
+    Assert(endLine >= startLine, "Invalid selected range or file in hex mode");
+    if ((startLine <= -1) || (endLine <= -1))
+    {
+        return -1;
+    }
+
+    // Check each line for empty
+    for (i = endLine; i >= startLine; --i)
+    {
+        // Read each line of the file
+        width = TextGetLineSize(i, true);
+        if (width > 0)
+        {
+            // Line contains whitespaces and/or text
+            TextReadLine(strLine, i, width);
+            StrTrimAll(strLine);
+            if (0 == Strlen(strLine))
+            {
+                // Line contains only linefeeds or blank line after trim - delete it
+                DeleteBytes(TextLineToAddress(i), width);
+                count++;
+            }
+        }
+    }
+
+    // Reset the selection
+    if( GetSelSize() > 0 )
+    {
+        int64 startPos = TextLineToAddress(startLine);
+        int64 endPos   = TextLineToAddress(endLine-count + 1);
+        if ((startPos >= 0) && (endPos >= 0))
+        {
+            SetSelection(startPos, endPos - startPos);
+            SetCursorPos(endPos);
+        }
+    }
+
+    // Show output
+    StatusMessage("Deleted %d lines.", count);
+
+    return (count > 0);
+}
+
+Main();

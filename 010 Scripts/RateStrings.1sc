@@ -1,0 +1,56 @@
+//------------------------------------------------
+//--- 010 Editor v10 Script File
+//
+//      File: RateStrings.1sc
+//   Authors: Tobias Michalski
+//   Version: 0.1.2
+//   Purpose: Uses Fireeyes StringSifter to Rate Strings
+//  Requires: https://github.com/fireeye/stringsifter
+//  Category: Search
+//   History: 
+//   0.1.2 2020-02-12 Tobias Michalski: Fixed the handling of filepaths with whitespaces.
+//   0.1.1 2019-12-02 Tobias Michalski: Fixed the command execution
+//   0.1.0 2019-11-22 Tobias Michalski: Removed external Script. Enhanced Error printing
+//------------------------------------------------
+void Main(void)
+{   
+    int curFile = GetFileNum();
+    string filename = GetFileName();
+    
+    string filenamerated = filename + ".rated";
+
+    string command1 = "flarestrings -n 4 '"+filename+"' | rank_strings -s | awk -F, '{ st = index($0,\",\");print $1 \"\\t|\\t\" substr($0,st+1)}' > '" + filenamerated+ "'";
+    string command = "-c \""+command1+"\"";
+    
+    int errorCode;
+    Exec("/bin/bash", command,true, errorCode );
+    if (errorCode != 0 ){
+        Printf("Something went wrong when executing the command:\n");
+        Printf(command+"\n");
+        Printf("Exec errorCode: %d\n", errorCode);
+        Exit(-1);
+    }
+    int res2  = FileOpen(filenamerated);
+    if (res2 < 0 ){ 
+        Printf("Something went wrong while opening the file \n");
+        Printf("This should be greater then 0: %d\n", res2);
+        Exit(-1);
+    }
+
+    OutputPaneClear();
+    int i = 0;
+    int count = TextGetNumLines();
+    Printf("Score\t|\tString\n");
+    Printf("____________________________________________________________________________________________________\n");
+    string text = "";
+    for( i = 0; i < count-1; i++ )
+    {
+        // Iterate through each line
+         TextReadLine( text, i,3000, false );
+         Printf("%s\n", text);
+    }
+    FileClose();
+    FileSelect(curFile);
+}
+
+Main();

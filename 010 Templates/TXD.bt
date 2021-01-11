@@ -1,0 +1,213 @@
+//------------------------------------------------
+//--- 010 Editor v9.0 Binary Template
+//
+//      File: TXD.bt
+//   Authors: shuax
+//   Version: 1.0
+//   Purpose: Parsing Tencent QQ txd or gmd files.
+//  Category: Misc
+// File Mask: *.txd,*.gmd
+//  ID Bytes: 54 44 01 01, 54 41 01 01
+//   History: 
+//   1.0   2020-12-15 shuax:First implementation
+//------------------------------------------------
+typedef ubyte uint8;
+
+typedef enum<uint32>
+{
+    Dict     = 0x54440101,
+    Array    = 0x54410101,
+} Tag;
+
+typedef struct
+{
+    uint16 size<fgcolor=cPurple>;
+    uint8 raw[size]<fgcolor=cDkGreen>;
+} EncryptKey <read=ReadEncryptKey>;
+
+typedef struct
+{
+    uint32 size<fgcolor=cPurple>;
+    if(size) uint8 raw[size]<fgcolor=cDkGreen>;
+} EncryptString <read=ReadEncryptString>;
+
+typedef struct
+{
+    uint32 size<fgcolor=cPurple>;
+    if(size) uint8 raw[size]<fgcolor=cDkGreen>;
+} EncryptBuffer <read=ReadEncryptBuffer>;
+
+string ToHex(uint8 buffer[], int size)
+{
+    string s;
+    string t;
+    local int i;
+    for(i=0;i<size;i++)
+    {
+        SPrintf(t, "%02X", buffer[i]);
+        s += t;
+    }
+    return s;
+}
+
+string ToHex2(uint16 buffer[], int size)
+{
+    string s;
+    string t;
+    local int i;
+    for(i=0;i<size;i++)
+    {
+        SPrintf(t, "%04X", buffer[i]);
+        s += t;
+    }
+    return s;
+}
+
+string ReadEncryptBuffer(EncryptBuffer& T)
+{
+    local uint8 temp[T.size];
+
+    local int i;
+    for(i=0;i<T.size;i++)
+    {
+        temp[i] = T.raw[i] ^ T.size ^ 0xFF;
+    }
+
+    return ToHex(temp, T.size);
+}
+
+string ReadEncryptKey(EncryptKey& T)
+{
+    local uint8 temp[T.size];
+
+    local int i;
+    for(i=0;i<T.size;i++)
+    {
+        temp[i] = T.raw[i] ^ T.size ^ 0xFF;
+    }
+
+    if(T.size%2!=0 || temp[1]!=0)
+    {
+        return temp;
+    }
+
+    local uint16 temp2[T.size/2];
+    for(i=0;i<T.size/2;i++)
+    {
+        temp2[i] = temp[i * 2] + (temp[i * 2 + 1] << 8);
+    }
+    return temp2;
+}
+
+string ReadEncryptString(EncryptString& T)
+{
+    local uint8 temp[T.size];
+
+    local int i;
+    for(i=0;i<T.size;i++)
+    {
+        temp[i] = T.raw[i] ^ T.size ^ 0xFF;
+    }
+
+    local uint16 temp2[T.size/2];
+    for(i=0;i<T.size/2;i++)
+    {
+        temp2[i] = temp[i * 2] + (temp[i * 2 + 1] << 8);
+    }
+    // return ToHex(temp, T.size);
+    return WStringToString(temp2, CHARSET_UTF8);
+}
+
+struct TXD;
+
+struct TXD
+{
+    BigEndian();
+    Tag tag<fgcolor=cRed, format=hex>;
+    LittleEndian();
+
+    if(tag==Dict)
+    {
+        uint16 count<fgcolor=cDkAqua>;
+    }
+    else if(tag==Array)
+    {
+        uint32 count<fgcolor=cDkAqua>;
+    }
+    else
+    {
+        Printf("not supported tag %x!\n", tag);
+        Exit(-1);
+    }
+    local int i;
+    for(i=0;i<count;i++)
+    {
+        struct
+        {
+            uint8 type<fgcolor=cDkYellow>;
+            switch(type)
+            {
+                case 1:
+                    EncryptKey key;
+                    uint32 size<fgcolor=cPurple>;
+                    uint32 value<fgcolor=cDkGreen>;
+                    break;
+                case 2:
+                    EncryptKey key;
+                    uint32 size<fgcolor=cPurple>;
+                    uint8 value<fgcolor=cDkGreen>;
+                    break;
+                case 6:
+                    EncryptKey key;
+                    uint32 size<fgcolor=cPurple>;
+                    uint32 value<fgcolor=cDkGreen>;
+                    break;
+                case 7:
+                    EncryptKey key;
+                    uint32 size<fgcolor=cPurple>;
+                    int32 value<fgcolor=cDkGreen>;
+                    break;
+                case 8:
+                    EncryptKey key;
+                    EncryptString value;
+                    break;
+                case 9:
+                    EncryptKey key;
+                    EncryptBuffer value;
+                    break;
+                case 11:
+                    if(tag==Dict)
+                    {
+                        EncryptKey key;
+                        uint32 size<fgcolor=cPurple>;
+                        TXD node;
+                    }
+                    else
+                    {
+                        uint32 size<fgcolor=cPurple>;
+                        TXD node;
+                    }
+                    break;
+                case 12:
+                    EncryptKey key;
+                    uint32 size;
+                    TXD node;
+                    break;
+                case 14:
+                    EncryptKey key;
+                    uint32 size<fgcolor=cPurple>;
+                    uint64 value<fgcolor=cDkGreen>;
+                    break;
+                case 15:
+                    EncryptKey key;
+                    uint32 size<fgcolor=cPurple>;
+                    double value<fgcolor=cDkGreen>;
+                    break;
+                default:
+                    Printf("not supported type %d!\n", type);
+                    Exit(-1);
+                    break;
+            }
+        } node;
+    }
+} node;
